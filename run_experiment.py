@@ -71,7 +71,7 @@ def hpo_candidates(seed: int, count: int):
 def main() -> None:
     args = options()
     args.results_dir.mkdir(parents=True, exist_ok=True)
-    specs = [spec for spec in SPECS if spec.slug in ("concrete", "power_plant")] if args.smoke else SPECS
+    specs = [spec for spec in SPECS if spec.slug in ("concrete", "elevators")] if args.smoke else SPECS
     data = {spec.slug: load_dataset(spec, args.cache_dir) for spec in specs}
     splits = {(spec.slug, seed): split_indices(len(data[spec.slug][0]), seed)
               for spec in specs for seed in args.seeds}
@@ -128,7 +128,7 @@ def main() -> None:
                 for seed in args.seeds:
                     train, val, test = splits[spec.slug, seed]
                     candidates = []
-                    for config in hpo_candidates(seed + spec.uci_id, args.hpo_trials):
+                    for config in hpo_candidates(seed + spec.dataset_id, args.hpo_trials):
                         validation = validate_config(x, y, cats, train, val, config,
                                                      args.iterations, seed, args.threads)
                         candidates.append((validation["val_rmse"], config, validation))
