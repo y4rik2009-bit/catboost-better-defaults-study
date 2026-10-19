@@ -12,23 +12,27 @@ We compare four approaches:
 
 1. **Library default:** `CatBoostRegressor` with CatBoost's installed-version defaults, except a shared tree budget, CPU, seed and RMSE loss.
 2. **Paper tuned default:** the regression CatBoost-TD configuration in Appendix C, Table C.3 of the paper.
-3. **Our transferred default:** choose one configuration from a small fixed grid using validation errors on four meta-train datasets, then apply that same configuration to two held-out datasets.
+3. **Our transferred default:** choose one configuration from a small fixed grid using validation errors on six meta-train datasets, then apply that same configuration to four held-out datasets.
 4. **Per-dataset HPO:** random hyperparameter search on each held-out dataset's validation split. This uses more fits and is a different compute budget.
 
-Every dataset is split by fixed seed into **60% train, 20% validation, 20% test**. Hyperparameters and the number of trees are chosen with validation data only. The final model is fitted on train plus validation and evaluated once on test. The transferred configuration is selected using only the four meta-train datasets. The held-out test targets never select a configuration.
+Every dataset is split by fixed seed into **60% train, 20% validation, 20% test**. Hyperparameters and the number of trees are chosen with validation data only. The final model is fitted on train plus validation and evaluated once on test. The transferred configuration is selected using only the six meta-train datasets. The held-out test targets never select a configuration.
 
 Main metric: **nRMSE = test RMSE / standard deviation of the train-plus-validation target**. This makes errors from datasets with different target units comparable. The script also reports RMSE and a shifted geometric mean of nRMSE across held-out tasks. Lower is better. The paper used a much larger benchmark and a different aggregate protocol, so these scores should not be compared numerically with its tables.
 
-| Role | Dataset | UCI ID | Target | Type |
+| Role | Dataset | Source ID | Target | Type |
 | --- | --- | ---: | --- | --- |
 | Meta-train | [Concrete Compressive Strength](https://archive.ics.uci.edu/dataset/165/concrete+compressive+strength) | 165 | Compressive strength | Regression |
 | Meta-train | [Airfoil Self-Noise](https://archive.ics.uci.edu/dataset/291/airfoil+self+noise) | 291 | Sound pressure | Regression |
 | Meta-train | [Wine Quality](https://archive.ics.uci.edu/dataset/186/wine+quality) | 186 | Quality score | Ordinal target treated as regression |
 | Meta-train | [Abalone](https://archive.ics.uci.edu/dataset/1/abalone) | 1 | Rings | Integer target treated as regression; `Sex` is categorical |
-| Meta-test | [Combined Cycle Power Plant](https://archive.ics.uci.edu/dataset/294/combined+cycle+power+plant) | 294 | Energy output | Regression |
-| Meta-test | [Superconductivty Data](https://archive.ics.uci.edu/dataset/464/superconductivty+data) | 464 | Critical temperature | Regression |
+| Meta-train | [Combined Cycle Power Plant](https://archive.ics.uci.edu/dataset/294/combined+cycle+power+plant) | UCI 294 | `PE` | Regression |
+| Meta-train | [Superconductivty Data](https://archive.ics.uci.edu/dataset/464/superconductivty+data) | UCI 464 | `critical_temp` | Regression |
+| Meta-test | [Elevators](https://www.openml.org/d/216) | OpenML 216 | `Goal` | Regression |
+| Meta-test | [Houses](https://www.openml.org/d/537) | OpenML 537 | `median_house_value` | Regression |
+| Meta-test | [Kin8nm](https://www.openml.org/d/189) | OpenML 189 | `y` | Regression |
+| Meta-test | [Quake](https://www.openml.org/d/209) | OpenML 209 | `richter` | Regression |
 
-`ucimlrepo` fetches the datasets on first run and caches them under `.cache/uci/`. This repository contains **no dataset copies**. Please check each UCI page for the dataset's license and citation when using the data elsewhere. The UCI Wine Quality API returns both red and white wine together; this project uses that combined version.
+`ucimlrepo` fetches six UCI datasets; scikit-learn fetches four OpenML datasets. Both sources are cached under `.cache/uci/`. This repository contains **no dataset copies**. Please check each source page for the dataset's license and citation when using the data elsewhere. The UCI Wine Quality API returns both red and white wine together; this project uses that combined version. Elevators, Kin8nm and Quake occur in the paper's meta-test benchmark; Houses occurs in its additional Grinsztajn benchmark. None of the four is listed in the paper's regression meta-train collection.
 
 ## Run locally
 
@@ -43,7 +47,7 @@ python -m venv .venv
 
 For macOS/Linux, replace `.venv\Scripts\python` with `.venv/bin/python`. The smoke check uses only Concrete and Power Plant, 50 trees and one seed. Its metrics are **not** a research conclusion.
 
-A manageable six-dataset pilot:
+A ten-dataset pilot:
 
 ```bash
 .venv\Scripts\python run_experiment.py --iterations 300 --seeds 42 --meta-candidates 6 --hpo-trials 5 --threads 4
@@ -63,11 +67,12 @@ For regression, Table C.3 gives CatBoost-TD: Plain boosting, Bernoulli bootstrap
 
 ## Results
 
-The pilot results and exact runtime settings will be added after the six-dataset run is checked. Results are descriptive: six datasets and one or a few splits cannot establish a general advantage. The paper's own conclusion is broader; our outcomes may differ.
+The pilot results and exact runtime settings will be added after the ten-dataset run is checked. Results are descriptive: ten datasets and one or a few splits cannot establish a general advantage. The paper's own conclusion is broader; our outcomes may differ.
 
 ## Limitations and next steps
 
-- This study has only **four meta-train and two meta-test datasets**, far fewer than the paper. Dataset choice and split seed can strongly affect the outcome.
+- This study has only **six meta-train and four meta-test datasets**, far fewer than the paper. Dataset choice and split seed can strongly affect the outcome.
+- The four meta-test datasets are held out from **our own** configuration search and from the authors' reported regression meta-train list. They do occur in the paper's evaluation benchmarks. Our data versions, preprocessing, seeds and 300-tree pilot differ, so our scores are not directly comparable with its tables.
 - HPO spends many fits per held-out dataset; comparing only error hides this compute cost. `run.json` and the metrics include training times.
 - All splits are random and assume rows are exchangeable. A real monthly retail turnover forecast requires a **time-based split**, store history, leakage checks and an appropriate business metric such as MAPE. The separate [RTO CatBoost project](https://github.com/y4rik2009-bit/rto-catboost-forecast) covers that context. Its competition data are not part of this repository.
 - CatBoost's library defaults may change with version. `run.json` records the installed version.
