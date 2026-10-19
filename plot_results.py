@@ -8,6 +8,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+plt.rcParams["svg.fonttype"] = "none"
+
 
 def main() -> None:
     path = Path("results/raw/metrics.csv")
@@ -32,14 +34,16 @@ def main() -> None:
     )
     ax.set_xlabel("")
     ax.set_ylabel("Test nRMSE (lower is better)")
-    ax.set_title("Held-out UCI datasets · descriptive results")
+    n_splits = frame["seed"].nunique()
+    ax.set_title(f"Held-out OpenML datasets · {n_splits} split{'s' if n_splits != 1 else ''}")
     ax.legend(title="", loc="upper left", frameon=False)
     ax.grid(axis="y", alpha=0.2)
     ax.set_axisbelow(True)
     plt.tight_layout()
-    output = Path("figures/heldout_nrmse.png")
+    output = Path("figures/heldout_nrmse.svg")
     output.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output, dpi=180)
+    plt.savefig(output, format="svg")
+    plt.savefig(output.with_suffix(".png"), dpi=180)
     print(output)
 
 
