@@ -32,6 +32,18 @@ PAPER_TD = Configuration(
 
 # A small, transparent search space for a new dataset-independent default.
 # It is our experiment, not the authors' optimization procedure.
+_GRID = [
+    (depth, lr, l2)
+    for depth in (5, 7, 9)
+    for lr in (0.03, 0.09)
+    for l2 in (1.0, 3.0)
+]
+# The first six cover every depth and learning rate for an affordable pilot.
+_PILOT_FIRST = [
+    (5, 0.03, 3.0), (5, 0.09, 1.0),
+    (7, 0.03, 1.0), (7, 0.09, 3.0),
+    (9, 0.03, 3.0), (9, 0.09, 1.0),
+]
 META_CANDIDATES = [
     Configuration(f"meta_{depth}_{lr}_{l2}", {
         "boosting_type": "Plain", "bootstrap_type": "Bernoulli",
@@ -39,9 +51,7 @@ META_CANDIDATES = [
         "l2_leaf_reg": l2, "random_strength": 0.0,
         "one_hot_max_size": 20, "border_count": 254,
     })
-    for depth in (5, 7, 9)
-    for lr in (0.03, 0.09)
-    for l2 in (1.0, 3.0)
+    for depth, lr, l2 in _PILOT_FIRST + [item for item in _GRID if item not in _PILOT_FIRST]
 ]
 
 
