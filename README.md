@@ -43,9 +43,10 @@ python -m venv .venv
 # Windows PowerShell:
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python run_experiment.py --smoke
+.venv\Scripts\python -m unittest discover -s tests -v
 ```
 
-For macOS/Linux, replace `.venv\Scripts\python` with `.venv/bin/python`. The smoke check uses only Concrete and Power Plant, 50 trees and one seed. Its metrics are **not** a research conclusion.
+For macOS/Linux, replace `.venv\Scripts\python` with `.venv/bin/python`. The smoke check uses only Concrete and Elevators, 50 trees and one seed. Its metrics are **not** a research conclusion.
 
 A ten-dataset pilot:
 
@@ -61,13 +62,29 @@ A more thorough but substantially slower run:
 
 The script writes `results/raw/metrics.csv`, `meta_search.csv`, `summary.csv` and `run.json`. These are ignored by Git; include only verified aggregate findings in this README. `run.json` records package versions, chosen configuration and runtime. Datasets, local caches, model files and private `.env` files are excluded by `.gitignore`.
 
+After a completed run, create the held-out comparison chart with `.venv\Scripts\python plot_results.py`.
+
 ## Paper configuration
 
 For regression, Table C.3 gives CatBoost-TD: Plain boosting, Bernoulli bootstrap, depth 9, learning rate 0.09, subsample 0.9, L2 leaf regularization 1e-5, random strength 0, one-hot threshold 20, leaf estimation iterations 20, 254 feature borders, 1000 trees, and early stopping `Iter`/300. The code uses CatBoost Python parameter aliases (`depth`, `iterations`, `border_count`) and reduces the stopping patience only when a shorter tree budget is requested. A 300-tree pilot therefore **does not test the exact 1000-tree paper recipe**.
 
 ## Results
 
-The pilot results and exact runtime settings will be added after the ten-dataset run is checked. Results are descriptive: ten datasets and one or a few splits cannot establish a general advantage. The paper's own conclusion is broader; our outcomes may differ.
+**Completed pilot:** 10 datasets (6 meta-train, 4 meta-test), seed `42`, at most 300 trees, 6 candidate shared configurations, 5 HPO trials per meta-test dataset, CPU with 4 threads. Tested with Python 3.12.10, CatBoost 1.2.10, NumPy 2.4.4, pandas 3.0.3 and scikit-learn 1.5.2. These are measured results from this repository, **not** values from the paper. Lower nRMSE is better.
+
+| Held-out dataset | Library default | Paper TD, 300 trees | Our shared default | Per-dataset HPO, 5 trials |
+| --- | ---: | ---: | ---: | ---: |
+| Elevators | 0.3092 | 0.3087 | **0.3084** | 0.3099 |
+| Houses | 0.4025 | **0.4006** | 0.4025 | 0.4038 |
+| Kin8nm | 0.4018 | 0.3455 | 0.3457 | **0.3394** |
+| Quake | 0.9965 | 0.9759 | **0.9752** | 0.9762 |
+| **Shifted geometric mean** | 0.4733 | 0.4528 | 0.4532 | **0.4521** |
+
+![Test nRMSE on four held-out datasets](figures/heldout_nrmse.svg)
+
+The shared configuration selected **only on meta-train validation** was `depth=9`, `learning_rate=0.09`, `l2_leaf_reg=1`, Bernoulli bootstrap with `subsample=0.9`, `random_strength=0`, `one_hot_max_size=20`, and `border_count=254`. The other settings remain CatBoost defaults. Its one-time search cost was **36 validation fits / 202 seconds**. On the four held-out datasets, validation plus refit took about **14 seconds** for library defaults, **52 seconds** for paper TD, and **32 seconds** for our shared default. Five-trial HPO plus refit took about **104 seconds** across those datasets. Times are machine-specific and exclude data download. Global search cost is separate from the shared default's held-out fit time.
+
+In this pilot, paper TD beat library defaults on all four held-out datasets, but the differences on Elevators and Houses were small. Our shared default was close to paper TD. Five-trial HPO had the best aggregate nRMSE by a tiny margin, while winning just one dataset. **One split and four held-out datasets cannot establish a general advantage or statistical significance.** A 300-tree cap and shortened stopping patience also mean this does **not** test the exact 1000-tree paper recipe. The HPO search space and trial count differ from the authors' 50-trial procedure.
 
 ## Limitations and next steps
 
