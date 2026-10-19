@@ -6,10 +6,16 @@ __pycache__/
 data/
 results/raw/
 *.csv
+*.parquet
+*.xlsx
+*.zip
+*.db
+*.sqlite3
 *.pkl
 *.joblib
 *.cbm
 catboost_info/
-.env
+figures/*.png
+.env*
 .ipynb_checkpoints/
 
