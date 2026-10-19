@@ -1,4 +1,4 @@
-"""Download and cache six UCI regression datasets without publishing the data."""
+"""Download and cache public UCI/OpenML regression datasets without publishing them."""
 
 from __future__ import annotations
 
@@ -7,16 +7,18 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.datasets import fetch_openml
 from ucimlrepo import fetch_ucirepo
 
 
 @dataclass(frozen=True)
 class DatasetSpec:
     slug: str
-    uci_id: int
+    dataset_id: int
     role: str
     target: str
     categorical: tuple[str, ...] = ()
+    source: str = "uci"
 
 
 SPECS = (
@@ -24,8 +26,12 @@ SPECS = (
     DatasetSpec("airfoil", 291, "meta_train", "scaled-sound-pressure"),
     DatasetSpec("wine_quality", 186, "meta_train", "quality"),
     DatasetSpec("abalone", 1, "meta_train", "Rings", ("Sex",)),
-    DatasetSpec("power_plant", 294, "meta_test", "PE"),
-    DatasetSpec("superconductivity", 464, "meta_test", "critical_temp"),
+    DatasetSpec("power_plant", 294, "meta_train", "PE"),
+    DatasetSpec("superconductivity", 464, "meta_train", "critical_temp"),
+    DatasetSpec("elevators", 216, "meta_test", "Goal", source="openml"),
+    DatasetSpec("houses", 537, "meta_test", "median_house_value", source="openml"),
+    DatasetSpec("kin8nm", 189, "meta_test", "y", source="openml"),
+    DatasetSpec("quake", 209, "meta_test", "richter", source="openml"),
 )
 
 
@@ -36,14 +42,25 @@ def load_dataset(spec: DatasetSpec, cache_dir: Path) -> tuple[pd.DataFrame, pd.S
     if path.exists():
         frame = pd.read_csv(path)
     else:
-        fetched = fetch_ucirepo(id=spec.uci_id)
-        x = fetched.data.features.reset_index(drop=True).copy()
-        targets = fetched.data.targets.reset_index(drop=True)
-        if spec.target not in targets:
-            raise ValueError(f"UCI {spec.uci_id}: expected target {spec.target!r}, got {list(targets)}")
+        if spec.source == "uci":
+            fetched = fetch_ucirepo(id=spec.dataset_id)
+            x = fetched.data.features.reset_index(drop=True).copy()
+            targets = fetched.data.targets.reset_index(drop=True)
+            if spec.target not in targets:
+                raise ValueError(f"UCI {spec.dataset_id}: expected target {spec.target!r}, got {list(targets)}")
+            target = targets[spec.target]
+        elif spec.source == "openml":
+            fetched = fetch_openml(data_id=spec.dataset_id, as_frame=True, parser="auto",
+                                   data_home=cache_dir / "openml_download")
+            x = fetched.data.reset_index(drop=True).copy()
+            target = fetched.target.reset_index(drop=True)
+            if target.name != spec.target:
+                raise ValueError(f"OpenML {spec.dataset_id}: expected target {spec.target!r}, got {target.name!r}")
+        else:
+            raise ValueError(f"Unknown source {spec.source!r}")
         if spec.target in x:
             raise ValueError(f"Target {spec.target!r} also occurs in features")
-        frame = x.assign(**{spec.target: targets[spec.target]})
+        frame = x.assign(**{spec.target: target})
         frame.to_csv(path, index=False)
 
     if spec.target not in frame:
