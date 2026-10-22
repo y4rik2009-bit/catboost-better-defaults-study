@@ -1,10 +1,8 @@
-# Better CatBoost defaults: a small transfer study
+# Can one CatBoost configuration work across different datasets?
 
-**Portfolio project · tabular regression · CatBoost · reproducible benchmarking**
+Tuning CatBoost separately for every dataset is expensive. The [*Better by Default* paper](https://proceedings.neurips.cc/paper_files/paper/2024/file/2ee1c87245956e3eaa71aaba5f5753eb-Paper-Conference.pdf) made me curious about a smaller question: if I choose settings on six regression datasets, how well do they carry over to four others?
 
-This project tests an idea from Holzmüller, Grinsztajn and Steinwart's NeurIPS 2024 paper [*Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data*](https://proceedings.neurips.cc/paper_files/paper/2024/file/2ee1c87245956e3eaa71aaba5f5753eb-Paper-Conference.pdf): can one fixed CatBoost configuration, selected on several datasets, transfer to new datasets without tuning each one from scratch?
-
-This is an **independent, small-scale partial reproduction** of the CatBoost regression idea. It is not a reproduction of the paper's full 208-dataset benchmark, its 10 splits, or its RealMLP contribution. The original implementation is [pytabkit](https://github.com/dholzmueller/pytabkit).
+This repo is my ten-dataset experiment with that idea. It compares the shared settings with the installed CatBoost defaults, the paper's CatBoost-TD settings, and a small search done separately for each new dataset. The paper used 208 datasets and also studied MLPs; this experiment does neither. The authors' code is in [pytabkit](https://github.com/dholzmueller/pytabkit).
 
 ## Experiment
 
@@ -12,7 +10,7 @@ We compare four approaches:
 
 1. **Library default:** `CatBoostRegressor` with CatBoost's installed-version defaults, except a shared tree budget, CPU, seed and RMSE loss.
 2. **Paper tuned default:** the regression CatBoost-TD configuration in Appendix C, Table C.3 of the paper.
-3. **Our transferred default:** choose one configuration from a small fixed grid using validation errors on six meta-train datasets, then apply that same configuration to four held-out datasets.
+3. **Shared configuration:** choose one configuration from a small fixed grid using validation errors on six meta-train datasets, then apply that same configuration to four held-out datasets.
 4. **Per-dataset HPO:** random hyperparameter search on each held-out dataset's validation split. This uses more fits and is a different compute budget.
 
 Every dataset is split by fixed seed into **60% train, 20% validation, 20% test**. Hyperparameters and the number of trees are chosen with validation data only. The final model is fitted on train plus validation and evaluated once on test. The transferred configuration is selected using only the six meta-train datasets. The held-out test targets never select a configuration.
@@ -72,7 +70,7 @@ For regression, Table C.3 gives CatBoost-TD: Plain boosting, Bernoulli bootstrap
 
 **Completed pilot:** 10 datasets (6 meta-train, 4 meta-test), seed `42`, at most 300 trees, 6 candidate shared configurations, 5 HPO trials per meta-test dataset, CPU with 4 threads. Tested with Python 3.12.10, CatBoost 1.2.10, NumPy 2.4.4, pandas 3.0.3 and scikit-learn 1.5.2. These are measured results from this repository, **not** values from the paper. Lower nRMSE is better.
 
-| Held-out dataset | Library default | Paper TD, 300 trees | Our shared default | Per-dataset HPO, 5 trials |
+| Held-out dataset | Library default | Paper TD, 300 trees | Shared configuration | Per-dataset HPO, 5 trials |
 | --- | ---: | ---: | ---: | ---: |
 | Elevators | 0.3092 | 0.3087 | **0.3084** | 0.3099 |
 | Houses | 0.4025 | **0.4006** | 0.4025 | 0.4038 |
@@ -82,9 +80,9 @@ For regression, Table C.3 gives CatBoost-TD: Plain boosting, Bernoulli bootstrap
 
 ![Test nRMSE on four held-out datasets](figures/heldout_nrmse.svg)
 
-The shared configuration selected **only on meta-train validation** was `depth=9`, `learning_rate=0.09`, `l2_leaf_reg=1`, Bernoulli bootstrap with `subsample=0.9`, `random_strength=0`, `one_hot_max_size=20`, and `border_count=254`. The other settings remain CatBoost defaults. Its one-time search cost was **36 validation fits / 202 seconds**. On the four held-out datasets, validation plus refit took about **14 seconds** for library defaults, **52 seconds** for paper TD, and **32 seconds** for our shared default. Five-trial HPO plus refit took about **104 seconds** across those datasets. Times are machine-specific and exclude data download. Global search cost is separate from the shared default's held-out fit time.
+The configuration selected **only on meta-train validation** was `depth=9`, `learning_rate=0.09`, `l2_leaf_reg=1`, Bernoulli bootstrap with `subsample=0.9`, `random_strength=0`, `one_hot_max_size=20`, and `border_count=254`. The other settings remain CatBoost defaults. Finding it took **36 validation fits / 202 seconds**. On the four held-out datasets, validation plus refit took about **14 seconds** for library defaults, **52 seconds** for paper TD, and **32 seconds** for the shared configuration. Five-trial HPO plus refit took about **104 seconds** across those datasets. Times are machine-specific and exclude data download. The 202-second search is a separate, one-time cost.
 
-In this pilot, paper TD beat library defaults on all four held-out datasets, but the differences on Elevators and Houses were small. Our shared default was close to paper TD. Five-trial HPO had the best aggregate nRMSE by a tiny margin, while winning just one dataset. **One split and four held-out datasets cannot establish a general advantage or statistical significance.** A 300-tree cap and shortened stopping patience also mean this does **not** test the exact 1000-tree paper recipe. The HPO search space and trial count differ from the authors' 50-trial procedure.
+In this pilot, paper TD beat library defaults on all four held-out datasets, though the differences on Elevators and Houses were small. The shared configuration was close to paper TD. Five-trial HPO had the best aggregate nRMSE by a tiny margin, while winning just one dataset. That is interesting, but one split and four held-out datasets are too little to call one approach generally better. The 300-tree cap and shortened stopping patience also mean this run did **not** test the exact 1000-tree paper recipe. The HPO search space and trial count differ from the authors' 50-trial procedure.
 
 ## Limitations and next steps
 
@@ -95,7 +93,7 @@ In this pilot, paper TD beat library defaults on all four held-out datasets, but
 - CatBoost's library defaults may change with version. `run.json` records the installed version.
 - A stronger follow-up would add more independent datasets and seeds, compare confidence intervals, and test the transferred setting on a private time-series task under the dataset's usage terms.
 
-## Author and attribution
+## References
 
-Independent implementation by [@y4rik2009-bit](https://github.com/y4rik2009-bit). Research idea and CatBoost-TD values: [Holzmüller et al., NeurIPS 2024](https://proceedings.neurips.cc/paper_files/paper/2024/hash/2ee1c87245956e3eaa71aaba5f5753eb-Abstract-Conference.html). Dataset pages above provide source and citation information. This repository's original code is MIT licensed; that license does not apply to the paper or third-party data.
+Research idea and CatBoost-TD values: [Holzmüller et al., NeurIPS 2024](https://proceedings.neurips.cc/paper_files/paper/2024/hash/2ee1c87245956e3eaa71aaba5f5753eb-Abstract-Conference.html). The dataset links above give their sources. The code in this repository is MIT licensed; the paper and datasets have their own terms.
 
