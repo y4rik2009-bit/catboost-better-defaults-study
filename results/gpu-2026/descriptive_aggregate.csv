@@ -1,0 +1,4 @@
+method,geometric_mean_rmse_ratio,mean_rank,strict_wins,datasets
+catboost_default,1.0,2.6,0,5
+optuna_30,0.9536754053594336,1.6,3,5
+shared_defaults,0.9766432197400673,1.8,2,5
